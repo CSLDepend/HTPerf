@@ -1,7 +1,9 @@
 h1. ZooKeeper Smoketest
 
-*Author: "Patrick Hunt":http://people.apache.org/~phunt/* (follow me on "twitter":http://twitter.com/phunt)
+*Original author: "Patrick Hunt":http://people.apache.org/~phunt/* (follow me on "twitter":http://twitter.com/phunt)
+
+*Modified by: "Cuong Pham"
 
 h1. Modifications
 
-I'm using this test to measure the frequencies of I/O related VM exit events. View data here: http://web.engr.illinois.edu/~pham9/projects/HTperf/
+This test is used to measure the frequencies of I/O related VM exit events. View data here: http://web.engr.illinois.edu/~pham9/projects/HTperf/
