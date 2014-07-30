@@ -31,6 +31,14 @@ parser.add_argument('-M', '--max_experiment_index', action="store",
                     dest='max_exp_idx',
                     default=1, type=int)
 
+parser.add_argument('-Y', '--ylim_top', action="store",
+                    dest='ylim_top',
+                    default=100000, type=int)
+
+parser.add_argument('-y', '--ylim_bottom', action="store",
+                    dest='ylim_bottom',
+                    default=0, type=int) 
+
 parser.add_argument('-o', '--output', action="store",
                     dest='output_file',
                     default='plot.pdf' )
@@ -122,9 +130,9 @@ class Series2D:
 
 
 if __name__ == '__main__':
-    TIME_SCALE = 1
+    TIME_SCALE = 1.0
     if args.latency_unit == 'msec':
-        TIME_SCALE = 1000
+        TIME_SCALE = 0.0001
 
     operations = ['created', 'set', 'get', 'deleted']
     n_ops = len(operations)
@@ -208,12 +216,14 @@ if __name__ == '__main__':
                  error_kw=error_config,
                  label='PIO write rates/sec')
 
+
+        plt.gca().set_ylim(bottom=args.ylim_bottom, top=args.ylim_top)
         plt.xlabel('Operations')
         plt.ylabel('Rates')
         plt.title('Zookeeper Latency test')
         plt.xticks(index + bar_width, operations)
         plt.legend()
 
-        plt.tight_layout()
+        # plt.tight_layout()
         pdf.savefig()
         plt.close()
