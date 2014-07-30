@@ -1,6 +1,6 @@
-VM performance monitoring using HyperTap
+h1. VM performance monitoring using HyperTap
 
-Author: Cuong Pham (phammanhcuong@gmail.com)
+*Author: "Cuong Pham" (phammanhcuong@gmail.com)
 
 Want to see some charts? Go to here: http://web.engr.illinois.edu/~pham9/projects/HTperf
 (Inspired by Homa's MedSafe_Infographics project)
