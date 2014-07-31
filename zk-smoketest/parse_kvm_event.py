@@ -95,7 +95,7 @@ class ParseZKLatency:
         self.test_info = {}
         with open(in_file) as fp:
             for line in fp:
-                m = re.search("(\S+)\s+(\d+)\s+permanent.+(\d+\.\d+)/sec\)", line)
+                m = re.search("(\S+)\s+(\d+)\s+permanent.+\s(\d+\.\d+)/sec\)", line)
                 if m:
                     self.znode_count = m.group(2)
                     self.test_info[m.group(1)] = float(m.group(3))
