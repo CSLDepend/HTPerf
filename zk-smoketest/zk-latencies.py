@@ -95,7 +95,7 @@ def timer(ops, msg, count=options.znode_count, name="kvm_event"):
         pass
 
     # CUONG - begin
-    stop_logging()
+    stop_logging(name)
     # CUONG - end
 
     print_elap(start, msg, count)
@@ -109,7 +109,7 @@ def timer2(func, msg, count=options.znode_count, name="kvm_event"):
     func()
 
     # CUONG - begin
-    stop_logging()
+    stop_logging(name)
     # CUONG - end
 
     print_elap(start, msg, count)
@@ -128,20 +128,31 @@ def flush_trace_pipe():
     cmd = "sudo cat /sys/kernel/debug/tracing/trace_pipe > /dev/null"
     subprocess.Popen(cmd, shell=True)
     sleep(5)
-    stop_logging()
+    stop_logging(None)
 
 def log_kvm_event(sec_name):
     flush_trace_pipe()
-    cmd = "sudo cat /sys/kernel/debug/tracing/trace_pipe | grep kvm_ > "
-    cmd += options.log_dir + "/" + sec_name + ".txt"
+
+    # log ifstat
+    out_file = options.log_dir + "/" + sec_name + ".txt"
+    cmd = "sudo virsh domifstat os_u1204_1 vnet0 > " + out_file
+    subprocess.call(cmd, shell=True)
+
+    cmd = "sudo cat /sys/kernel/debug/tracing/trace_pipe | grep kvm_ >> "
+    cmd += out_file
 
     return subprocess.Popen(cmd, shell=True)
 
-def stop_logging():
+def stop_logging(sec_name):
     # print "stop logging."
     cmd = "sudo kill -9 `pgrep cat`"
     subprocess.call(cmd, shell=True)
-    # subprocess.call('ps aux', shell=True)
+
+    if sec_name:
+        # log ifstat
+        out_file = options.log_dir + "/" + sec_name + ".txt"
+        cmd = "sudo virsh domifstat os_u1204_1 vnet0 >> " + out_file
+        subprocess.call(cmd, shell=True)
 
 # CUONG - end
 
