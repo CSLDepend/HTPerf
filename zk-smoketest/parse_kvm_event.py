@@ -59,6 +59,14 @@ class EventSeries:
         self.event_pattern = re.compile(pattern)
         self.events = []
         self.parse_time = re.compile('.+\s(\d+)\.(\d+):\s.+')
+        self.tx_bytes_start = None
+        self.tx_packets_start = None
+        self.rx_bytes_start = None
+        self.rx_packets_start = None
+        self.tx_bytes_end = None
+        self.tx_bytes_end = None
+        self.rx_packets_end = None
+        self.rx_packets_end = None
 
     def try_add(self, line):
         if self.event_pattern.search(line):
@@ -76,6 +84,41 @@ class EventSeries:
             except ValueError:
                 print "Wrong format."
                 sys.exit()
+        else:
+            m = re.search('^vnet0 rx_bytes (\d+)', line)
+            if m:
+                if not self.rx_bytes_start:
+                    self.rx_bytes_start = long(m.group(1))
+                else:
+                    self.rx_bytes_end = long(m.group(1))
+            m = re.search('^vnet0 tx_bytes (\d+)', line)
+            if m:
+                if not self.tx_bytes_start:
+                    self.tx_bytes_start = long(m.group(1))
+                else:
+                    self.tx_bytes_end = long(m.group(1))
+            m = re.search('^vnet0 rx_packets (\d+)', line)
+            if m:
+                if not self.rx_packets_start:
+                    self.rx_packets_start = long(m.group(1))
+                else:
+                    self.rx_packets_end = long(m.group(1))
+            m = re.search('^vnet0 tx_packets (\d+)', line)
+            if m:
+                if not self.tx_packets_start:
+                    self.tx_packets_start = long(m.group(1))
+                else:
+                    self.tx_packets_end = long(m.group(1))
+
+    # duration in usec
+    def get_duration(self):
+        count = len(self.events)
+        if count == 0:
+            print "Error: No event!"
+            sys.exit()
+
+        duration = self.events[count - 1] - self.events[0]
+        return duration
 
     # get event arrival rate in seconds
     def get_rate(self):
@@ -84,11 +127,39 @@ class EventSeries:
             print "Error: No event!"
             sys.exit()
 
-        duration = self.events[count - 1] - self.events[0]
+        return float(count)*USEC_PER_SEC/float(self.get_duration())
 
-        # print "count=%d; duration=%d(usec)" % (count, duration) 
+    # get rx throughput in bytes/seconds
+    def get_rx_throughput_bytes(self):
+        if not (self.rx_bytes_start or self.rx_bytes_end):
+            print "No rx throughput data."
+            sys.exit()
 
-        return float(count)*USEC_PER_SEC/float(duration)
+        return (self.rx_bytes_end - self.rx_bytes_start)*USEC_PER_SEC/float(self.get_duration())
+
+    # get tx throughput in bytes/seconds
+    def get_tx_throughput_bytes(self):
+        if not (self.tx_bytes_start or self.tx_bytes_end):
+            print "No tx throughput data."
+            sys.exit()
+
+        return (self.tx_bytes_end - self.tx_bytes_start)*USEC_PER_SEC/float(self.get_duration())
+
+    # get rx throughput in packets/seconds
+    def get_rx_throughput_packets(self):
+        if not (self.rx_packets_start or self.rx_packets_end):
+            print "No rx throughput data."
+            sys.exit()
+
+        return (self.rx_packets_end - self.rx_packets_start)*USEC_PER_SEC/float(self.get_duration())
+
+    # get tx throughput in packets/seconds
+    def get_tx_throughput_packets(self):
+        if not (self.tx_packets_start or self.tx_packets_end):
+            print "No tx throughput data."
+            sys.exit()
+
+        return (self.tx_packets_end - self.tx_packets_start)*USEC_PER_SEC/float(self.get_duration())
 
 class ParseZKLatency:
     def __init__(self, in_file):
@@ -137,6 +208,8 @@ if __name__ == '__main__':
     operations = ['created', 'set', 'get', 'deleted']
     n_ops = len(operations)
     n_exps = args.max_exp_idx - args.min_exp_idx + 1
+    tx_rates = Series2D(n_exps)
+    rx_rates = Series2D(n_exps)
     req_rates = Series2D(n_exps)
     apic_write_rates = Series2D(n_exps)
     apic_read_rates = Series2D(n_exps)
@@ -164,6 +237,11 @@ if __name__ == '__main__':
                     apic_read.try_add(line)
                     pio_write.try_add(line)
 
+            rx_rates.append_to_row(
+                n_idx, apic_write.get_rx_throughput_packets() * TIME_SCALE)
+            tx_rates.append_to_row(
+                n_idx, apic_write.get_tx_throughput_packets() * TIME_SCALE)
+
             apic_write_rates.append_to_row(n_idx, apic_write.get_rate())
             apic_read_rates.append_to_row(n_idx, apic_read.get_rate())
             pio_write_rates.append_to_row(n_idx, pio_write.get_rate())
@@ -176,10 +254,10 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
 
     index = np.arange(n_ops)
-    bar_width = 0.2
+    bar_width = 1.0/8
     error_config = {'ecolor': '0.3'}
 
-    opacity = 0.4
+    opacity = 1
 
     req_rates.dump()
 
@@ -192,15 +270,25 @@ if __name__ == '__main__':
                  error_kw=error_config,
                  label='ZK request rates/' + args.latency_unit)
 
-        plt.bar(index + bar_width, apic_write_rates.get_means(), bar_width,
+        plt.bar(index + bar_width, rx_rates.get_means(), bar_width,
                  alpha=opacity,
-                 color='r',
-                 log=args.log_scale,
-                 yerr=apic_write_rates.get_std(),
+                 edgecolor='black',
+                 color='y',
+                 hatch='//',
+                 yerr=rx_rates.get_std(),
                  error_kw=error_config,
-                 label='APIC write rates/sec')
+                 label='VM RX packets/' + args.latency_unit)
 
-        plt.bar(index + 2*bar_width, apic_read_rates.get_means(), bar_width,
+        plt.bar(index + 2*bar_width, tx_rates.get_means(), bar_width,
+                 alpha=opacity,
+                 edgecolor='black',
+                 color='r',
+                 hatch='//',
+                 yerr=tx_rates.get_std(),
+                 error_kw=error_config,
+                 label='VM TX packets/' + args.latency_unit)
+
+        plt.bar(index + 3*bar_width, apic_read_rates.get_means(), bar_width,
                  alpha=opacity,
                  color='y',
                  log=args.log_scale,
@@ -208,7 +296,15 @@ if __name__ == '__main__':
                  error_kw=error_config,
                  label='APIC read rates/sec')
 
-        plt.bar(index + 3*bar_width, pio_write_rates.get_means(), bar_width,
+        plt.bar(index + 4*bar_width, apic_write_rates.get_means(), bar_width,
+                 alpha=opacity,
+                 color='r',
+                 log=args.log_scale,
+                 yerr=apic_write_rates.get_std(),
+                 error_kw=error_config,
+                 label='APIC write rates/sec')
+
+        plt.bar(index + 5*bar_width, pio_write_rates.get_means(), bar_width,
                  alpha=opacity,
                  color='g',
                  log=args.log_scale,
@@ -221,8 +317,8 @@ if __name__ == '__main__':
         plt.xlabel('Operations')
         plt.ylabel('Rates')
         plt.title('Zookeeper Latency test')
-        plt.xticks(index + bar_width, operations)
-        plt.legend()
+        plt.xticks(index + 3*bar_width, operations)
+        plt.legend(loc=2)
 
         # plt.tight_layout()
         pdf.savefig()
